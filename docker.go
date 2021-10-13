@@ -708,6 +708,11 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 		NetworkMode:  req.NetworkMode,
 	}
 
+	//TODO: Add tests
+	if len(req.Groups) > 0 {
+		hostConfig.GroupAdd = req.Groups
+	}
+
 	endpointConfigs := map[string]*network.EndpointSettings{}
 
 	// #248: Docker allows only one network to be specified during container creation
