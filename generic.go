@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // GenericContainerRequest represents parameters to a generic container
 type GenericContainerRequest struct {
-	ContainerRequest              // embedded request for provider
-	Started          bool         // whether to auto-start the container
-	ProviderType     ProviderType // which provider to use, Docker if empty
+	ContainerRequest                           // embedded request for provider
+	Started          bool                      // whether to auto-start the container
+	ProviderType     ProviderType              // which provider to use, Docker if empty
+	DependsOn        []GenericContainerRequest // slice of container requests that this request depends on succeeding
 }
 
 // GenericNetworkRequest represents parameters to a generic network
@@ -35,6 +37,19 @@ func GenericNetwork(ctx context.Context, req GenericNetworkRequest) (Network, er
 
 // GenericContainer creates a generic container with parameters
 func GenericContainer(ctx context.Context, req GenericContainerRequest) (Container, error) {
+	errs, _ := errgroup.WithContext(ctx)
+	for _, dep := range req.DependsOn {
+		dep := dep
+		errs.Go(func() error {
+			_, err := GenericContainer(ctx, dep)
+			return err
+		})
+
+	}
+	if err := errs.Wait(); err != nil {
+		return nil, err
+	}
+
 	provider, err := req.ProviderType.GetProvider()
 	if err != nil {
 		return nil, err
